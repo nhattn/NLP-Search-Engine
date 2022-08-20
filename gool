@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import os
+from flask import Flask
+from flask import request, jsonify
+from api.google import google_search
+
+app = Flask(__name__)
+
+app.config["JSON_AS_ASCII"] = False
+app.config["JSONIFY_PRETTYPRINT_REGULAR"] = False
+app.config["DEBUG"] = False
+app.config["PORT"] = 9091
+app.secret_key = os.urandom(42)
+
+def get_request_data(req):
+    if req.method == 'POST':
+        if req.content_type and "application/json" in req.content_type:
+            data = req.get_json()
+        else:
+            data = req.form
+    else:
+        data = req.args
+
+    return data
+
+@app.route('/api',methods=['POST'])
+def gool_api():
+    data = get_request_data(request)
+    query = data.get('q', '').strip()
+    if not query:
+        return jsonify({
+            'error':'Không có dữ liệu truy vấn'
+        })
+
+    results = google_search(query,2)
+    return jsonify(results)
+
+@app.errorhandler(404)
+def openbub_not_found(err):
+    return jsonify({
+        'error':'Không tìm thấy yêu cầu'
+    }), 404
+
+@app.errorhandler(400)
+def openbub_bad_request(err):
+    return jsonify({
+        'error':'Yêu cầu không chính xác'
+    }), 400
+
+@app.errorhandler(500)
+def openbub_server_error(err):
+    return jsonify({
+        'error':'Hệ thống đang bảo trì, vui lòng thử lại sau'
+    }), 500
+
+@app.errorhandler(405)
+def openbub_not_allowed(err):
+    return jsonify({
+        'error':'Phương thức gửi dữ liệu không được chấp nhận'
+    }), 405
+
+@app.errorhandler(403)
+def openbub_forbidden(err):
+    return jsonify({
+        'error':'Yêu cầu này không có quyền truy xuất'
+    }), 403
+
+if __name__ == "__main__":
+    if app.config["DEBUG"] == False:
+        import logging
+        log = logging.getLogger('werkzeug')
+        log.disabled = True
+        app.logger.disabled = True
+
+    app.run('0.0.0.0', port=app.config["PORT"])
